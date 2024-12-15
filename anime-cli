@@ -1,5 +1,7 @@
 #!/bin/sh
 
+version_number="1.0"
+
 # UI
 
 use_external_menu=0
@@ -55,7 +57,7 @@ help_info() {
       -s, --syncplay
         Use Syncplay to watch with friends
       -S, --select-nth
-        Select nth entry
+        Select nth ntry
       -q, --quality
         Specify the video quality
       -v, --vlc
@@ -69,23 +71,24 @@ help_info() {
       --rofi
         Use rofi instead of fzf for the interactive menu
       --skip
-        Use ani-skip to skip the intro of the episode (mpv only)
+        Use anime-skip to skip the intro of the episode (mpv only)
       --no-detach
         Don't detach the player (useful for in-terminal playback, mpv only)
       --exit-after-play
         Exit the player, and return the player exit code (useful for non interactive scenarios, works only if --no-detach is used, mpv only)
-      --skip-title <title>
-        Use given title as ani-skip query
-      -N, --nextep-countdown
-        Display a countdown to the next episode
     Some example usages:
       %s -q 720p banana fish
-      %s --skip --skip-title \"one piece\" -S 2 one piece
+      %s --skip -S 2 one piece
       %s -d -e 2 cyberpunk edgerunners
       %s --vlc cyberpunk edgerunners -q 1080p -e 4
       %s blue lock -e 5-6
       %s -e \"5 6\" blue lock
     \n" "${0##*/}" "${0##*/}" "${0##*/}" "${0##*/}" "${0##*/}" "${0##*/}" "${0##*/}" "${0##*/}" "${0##*/}"
+    exit 0
+}
+
+version_info() {
+    printf "%s\n" "$version_number"
     exit 0
 }
 
@@ -239,16 +242,11 @@ download() {
 }
 
 play_episode() {
-    [ "$log_episode" = 1 ] && [ "$player_function" != "debug" ] && [ "$player_function" != "download" ] && command -v logger >/dev/null && logger -t anime-cli "${allanime_title}${ep_no}"
-    [ "$skip_intro" = 1 ] && skip_flag="$(ani-skip -q "$mal_id" -e "$ep_no")"
+    [ "$log_episode" = 1 ] && [ "$player_function" != "download" ] && command -v logger >/dev/null && logger -t anime-cli "${allanime_title}${ep_no}"
+    [ "$skip" = 1 ] && skip_flag="$(anime-skip -q "$id" -e "$ep_no")"    
     [ -z "$episode" ] && get_episode_url
 
-    # shellcheck disable=SC2086
     case "$player_function" in
-        debug)
-            [ -z "$ANI_CLI_NON_INTERACTIVE" ] && printf "All links:\n%s\nSelected link:\n" "$links"
-            printf "%s\n" "$episode"
-            ;;
         mpv*)
             if [ "$no_detach" = 0 ]; then
                 nohup "$player_function" $skip_flag --force-media-title="${allanime_title}${ep_title}" "$episode" >/dev/null 2>&1 &
@@ -303,7 +301,7 @@ play() {
         play_episode
     fi
     # moves up to stored position and deletes to end
-    [ "$player_function" != "debug" ] && [ "$player_function" != "download" ] && tput rc && tput ed
+    [ "$player_function" != "download" ] && tput rc && tput ed
 }
 
 # MAIN
@@ -324,8 +322,7 @@ esac
 no_detach="${ANI_CLI_NO_DETACH:-0}"
 exit_after_play="${ANI_CLI_EXIT_AFTER_PLAY:-0}"
 use_external_menu="${ANI_CLI_EXTERNAL_MENU:-0}"
-skip_intro="${ANI_CLI_SKIP_INTRO:-0}"
-skip_title="$ANI_CLI_SKIP_TITLE"
+skip="${ANI_CLI_SKIP_INTRO:-0}"
 [ -t 0 ] || use_external_menu=1
 hist_dir="${ANI_CLI_HIST_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/anime-cli}"
 [ ! -d "$hist_dir" ] && mkdir -p "$hist_dir"
@@ -377,6 +374,7 @@ while [ $# -gt 0 ]; do
             esac
             exit 0
             ;;
+        -V | --version) version_info ;;
         -h | --help) help_info ;;
         -e | --episode | -r | --range)
             [ $# -lt 2 ] && die "missing argument!"
@@ -387,13 +385,7 @@ while [ $# -gt 0 ]; do
         --no-detach) no_detach=1 ;;
         --exit-after-play) exit_after_play=1 ;;
         --rofi) use_external_menu=1 ;;
-        --skip) skip_intro=1 ;;
-        --skip-title)
-            [ $# -lt 2 ] && die "missing argument!"
-            skip_title="$2"
-            shift
-            ;;
-        -N | --nextep-countdown) search=nextep ;;
+        --skip) skip=1 ;;
         *) query="$(printf "%s" "$query $1" | sed "s|^ ||;s| |+|g")" ;;
     esac
     shift
@@ -403,10 +395,9 @@ done
 [ "$use_external_menu" = "1" ] && multi_selection_flag="${ANI_CLI_MULTI_SELECTION:-"-multi-select"}"
 printf "\33[2K\r\033[1;34mChecking dependencies...\033[0m\n"
 dep_ch "curl" "sed" "grep" || true
-[ "$skip_intro" = 1 ] && (dep_ch "ani-skip" || true)
+[ "$skip" = 1 ] && (dep_ch "anime-skip" || true)
 if [ -z "$ANI_CLI_NON_INTERACTIVE" ]; then dep_ch fzf || true; fi
 case "$player_function" in
-    debug) ;;
     download) dep_ch "ffmpeg" "aria2c" ;;
     android*) printf "\33[2K\rChecking of players on Android is disabled\n" ;;
     *iSH*) printf "\33[2K\rChecking of players on iOS is disabled\n" ;;
@@ -459,7 +450,6 @@ case "$search" in
         update_episode_title
         ;;
 esac
-[ "$skip_intro" = 1 ] && mal_id="$(ani-skip -q "${skip_title:-${title}}")"
 
 # moves the cursor up one line and clears that line
 tput cuu1 && tput el
@@ -468,9 +458,9 @@ tput sc
 
 # playback & loop
 play
-[ "$player_function" = "download" ] || [ "$player_function" = "debug" ] && exit 0
+[ "$player_function" = "download" ] && exit 0
 
-while cmd=$(printf "next\nreplay\nprevious\nselect\nchange_quality\nquit" | nth "Playing $ep_title of $title... "); do
+while cmd=$(printf "next\nreplay\nprevious\nselect\nchange_quality\nskip\nquit" | nth "Playing $ep_title of $title... "); do
     case "$cmd" in
         next) ep_no=$(printf "%s" "$ep_list" | sed -n "/^${ep_no} /{n;p;}" |    cut -d ' ' -f1 | head -n1) 2>/dev/null && update_episode_title ;;
         replay) episode="$replay" ;;
@@ -478,6 +468,8 @@ while cmd=$(printf "next\nreplay\nprevious\nselect\nchange_quality\nquit" | nth 
         select) ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1) && update_episode_title ;;
         change_quality)
             episode=$(printf "%s" "$ql_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select quality: " | cut -f1) && verify_and_reroll_quality "$quality" ;;
+        skip)
+            skip=$(printf "1	Yes\n0	No" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select skip: " | cut -f1) ;;
         *) exit 0 ;;
     esac
     [ -z "$ep_no" ] && die "Out of range"

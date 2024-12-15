@@ -1,0 +1,118 @@
+#!/bin/sh
+
+version_number="1.0"
+
+die() {
+    printf "\33[2K\r\033[1;31m%s\033[0m\n" "$*" >&2
+    exit 1
+}
+
+help_info() {
+    printf "
+    Usage:
+    %s [OPTIONS]
+
+    Options:
+      -q, --query
+        Anime ID
+      -e, --episode
+        Specify the episode number
+      -V, --version
+        Show the version of the script
+      -h, --help
+        Show this help message and exit
+    Some example usages:
+      %s -q 52299 -e 5 # Returns MPV skip flag
+    \n" "${0##*/}" "${0##*/}" "${0##*/}" "${0##*/}" 
+    exit 0
+}
+
+format_time() {
+    local time_in_seconds=$1
+    printf "%s" "$((time_in_seconds * 1000))"
+}
+
+get_timecodes() {
+    response=$(curl -s -G "https://anilibria.top/api/v1/anime/releases/$id" \
+        --data-urlencode "limit=40" \
+        -H "accept: application/json" \
+        | jq '.episodes')
+
+    opening_start=$(printf "%s" "$response" | jq -r '.[] | select(.ordinal == '$ep_no') | "\(.opening.start)"')
+    opening_stop=$(printf "%s" "$response" | jq -r '.[] | select(.ordinal == '$ep_no') | "\(.opening.stop)"')
+    ending_start=$(printf "%s" "$response" | jq -r '.[] | select(.ordinal == '$ep_no') | "\(.ending.start)"')
+    ending_stop=$(printf "%s" "$response" | jq -r '.[] | select(.ordinal == '$ep_no') | "\(.ending.stop)"')    
+}
+
+generate_flags() {
+    script_opts="--script-opts="
+    [ $opening_start == "null" ] && unset opening_start
+    [ $opening_stop == "null" ] && unset opening_stop
+    [ $ending_start == "null" ] && unset ending_start
+    [ $ending_stop == "null" ] && unset ending_stop
+    [ -n $opening_start ] && script_opts="${script_opts}skip-op_start=$opening_start"
+    [ -n $opening_stop ] && script_opts="$script_opts,skip-op_end=$opening_stop"
+    [ -n $ending_start ] && script_opts="$script_opts,skip-ed_start=$ending_start"
+    [ -n $ending_stop ] && script_opts="$script_opts,skip-ed_end=$ending_stop"
+}
+
+generate_chapters_file() {
+    chapters_file="$(mktemp)"
+    if [[ -n "$opening_start" || -n "$ending_start" ]]; then
+        {
+            if [[ -n "$opening_start" && -n $opening_stop ]]; then
+                printf ";FFMETADATA1\n"
+                printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=%d\nTITLE=Before Opening\n\n" "$(format_time "$opening_start")"
+                printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\nTITLE=Opening\n\n" "$(format_time "$opening_start")" "$(format_time "$opening_stop")"
+                if [ -n $ending_start ]; then
+                    printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\nTITLE=Main Episode\n\n" "$(format_time "$opening_stop")" "$(format_time "$ending_start")"
+                else
+                    printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\nTITLE=Main Episode\n\n" "$(format_time "$opening_stop")" "$(format_time $(expr $opening_stop + 10))"
+                fi
+            fi
+            if [[ -n "$ending_start" && -n $ending_stop ]]; then
+                printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\nTITLE=Ending\n\n" "$(format_time "$ending_start")" "$(format_time "$ending_stop")"
+                printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\nTITLE=After Ending\n\n" "$(format_time "$ending_stop")" "$(format_time $(expr $ending_stop + 10))"
+            fi
+        } > "$chapters_file"
+        printf "%s%s %s" "--chapters-file=" "$chapters_file" "$script_opts"
+    else
+        printf "%s" "$script_opts"
+    fi
+}
+
+create() {
+    get_timecodes
+    generate_flags
+    generate_chapters_file
+}
+
+[ $# -eq 0 ] && help_info
+while [ $# -gt 0 ]; do
+    [ "$OSTYPE" = msys* ] && flag=${1//[![:print:]]/} || flag="$1"
+    case "$flag" in
+        -V | --version) printf "%s\n" "$version_number" && exit 0 ;;
+        -h | --help) help_info ;;
+        -q | --query)
+            [ $# -lt 2 ] && die "missing anime ID!"
+            case $2 in
+                *) id=$2 ;;
+            esac
+            shift
+            ;;
+        -e | --episode)
+            [ $# -lt 2 ] && die "missing episode number!"
+            case $2 in
+                ''|*[!0-9]*) die "value must be a number!" ;;
+                *) ep_no=$2 ;;
+            esac
+    esac
+    shift
+done
+
+[ -z "$id" ] && die "-q/--query is required!"
+if [ -z "$ep_no" ]; then
+    printf "%s" "$id"
+else
+    create $id $ep_no
+fi
