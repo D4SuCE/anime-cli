@@ -30,7 +30,11 @@ nth() {
     else
         line=$(printf "%s" "$stdin" | cut -f1,3 | tr '\t' ' ' | launcher "$multi_flag" "$prompt" | cut -d ' ' -f1)
     fi
-    [ -n "$line" ] && printf "%s" "$stdin" | grep -E '^'"${line}" | cut -f2,3 || exit 1
+    [ -n "$line" ] && result=$(printf "%s" "$stdin" | grep -E '^'"${line}"'($|[[:space:]])' | cut -f2,3)
+    [ -n "$result" ] && printf "%s" "$result" && return
+    [ -n "$line" ] && result=$(printf "%s" "$stdin" | grep -F -x "${line}" | cut -f2,3)
+    [ -n "$result" ] && printf "%s" "$result" && return
+    exit 1
 }
 
 die() {
@@ -140,7 +144,7 @@ search_anime() {
         episodes_number=$(printf "%s" "$request" | jq "[.episodes[] | select(.ordinal)] | length")
         episodes_total=$(printf "%s" "$request" | jq -r ".episodes_total // \"0\"")
 
-        if [ "$episodes_number" == 0 ]; then
+        if [ "$episodes_number" = 0 ]; then
             continue
         fi
         
@@ -175,7 +179,7 @@ quality_list() {
 verify_and_reroll_quality() {
     url=$(select_quality "$quality")
     http_status=$(curl -o /dev/null -w "%{http_code}" -s "$url")
-    if [ "$http_status" == 200 ]; then
+    if [ "$http_status" = 200 ]; then
         printf "%s" "$url"
         return
     fi
@@ -457,7 +461,7 @@ tput sc
 
 # playback & loop
 play
-[ "$player_function" == "download" ] && exit 0
+[ "$player_function" = "download" ] && exit 0
 
 while cmd=$(printf "next\nreplay\nprevious\nselect\nchange_quality\nskip\nquit" | nth "Playing $ep_title of $title... "); do
     case "$cmd" in
