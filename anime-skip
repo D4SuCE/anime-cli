@@ -50,10 +50,10 @@ generate_flags() {
     [ $opening_stop == "null" ] && unset opening_stop
     [ $ending_start == "null" ] && unset ending_start
     [ $ending_stop == "null" ] && unset ending_stop
-    [ -n $opening_start ] && script_opts="${script_opts}skip-op_start=$opening_start"
-    [ -n $opening_stop ] && script_opts="$script_opts,skip-op_end=$opening_stop"
-    [ -n $ending_start ] && script_opts="$script_opts,skip-ed_start=$ending_start"
-    [ -n $ending_stop ] && script_opts="$script_opts,skip-ed_end=$ending_stop"
+    [[ -n $opening_start ]] && script_opts="${script_opts}skip-op_start=$opening_start"
+    [[ -n $opening_stop ]] && script_opts="$script_opts,skip-op_end=$opening_stop"
+    [[ -n $ending_start ]] && script_opts="$script_opts,skip-ed_start=$ending_start"
+    [[ -n $ending_stop ]] && script_opts="$script_opts,skip-ed_end=$ending_stop"
 }
 
 generate_chapters_file() {
@@ -64,7 +64,7 @@ generate_chapters_file() {
                 printf ";FFMETADATA1\n"
                 printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=%d\nTITLE=Before Opening\n\n" "$(format_time "$opening_start")"
                 printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\nTITLE=Opening\n\n" "$(format_time "$opening_start")" "$(format_time "$opening_stop")"
-                if [ -n $ending_start ]; then
+                if [[ -n $ending_start ]]; then
                     printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\nTITLE=Main Episode\n\n" "$(format_time "$opening_stop")" "$(format_time "$ending_start")"
                 else
                     printf "[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\nTITLE=Main Episode\n\n" "$(format_time "$opening_stop")" "$(format_time $(expr $opening_stop + 10))"

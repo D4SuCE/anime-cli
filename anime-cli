@@ -29,8 +29,8 @@ nth() {
         line=$(printf "%s" "$stdin" | cut -f1,3 | tr '\t' ' ' | launcher "$multi_flag" "$prompt")
     else
         line=$(printf "%s" "$stdin" | cut -f1,3 | tr '\t' ' ' | launcher "$multi_flag" "$prompt" | cut -d ' ' -f1)
-    fi    
-    [ -n "$line" ] && printf "%s" "$stdin" | grep -E '^'"${line}"'($|[[:space:]])' | cut -f2,3 || exit 1
+    fi
+    [ -n "$line" ] && printf "%s" "$stdin" | grep -E '^'"${line}" | cut -f2,3 || exit 1
 }
 
 die() {
@@ -196,7 +196,6 @@ verify_and_reroll_quality() {
 
 get_episode_url() {
     ql_list=$(quality_list)
-    ql_list="$ql_list"$'\n'    
     episode=$(verify_and_reroll_quality "$quality")
     
     if printf "%s" "$ep_list" | grep -q "^$ep_no"; then
@@ -243,9 +242,9 @@ download() {
 
 play_episode() {
     [ "$log_episode" = 1 ] && [ "$player_function" != "download" ] && command -v logger >/dev/null && logger -t anime-cli "${allanime_title}${ep_no}"
-    [ "$skip" = 1 ] && skip_flag="$(anime-skip -q "$id" -e "$ep_no")"    
+    skip_flag="$(anime-skip -q "$id" -e "$ep_no")"
+    [ "$skip" = 0 ] && skip_flag="$(printf "%s" "$skip_flag" | cut -d ' ' -f1)"
     [ -z "$episode" ] && get_episode_url
-
     case "$player_function" in
         mpv*)
             if [ "$no_detach" = 0 ]; then
@@ -445,7 +444,7 @@ case "$search" in
         id=$(printf "%s" "$result" | cut -f1)
         episodes_json=$(get_episodes_json "$id")
         ep_list=$(episodes_list)
-        [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)
+        [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
         [ -z "$ep_no" ] && exit 1
         update_episode_title
         ;;
@@ -458,7 +457,7 @@ tput sc
 
 # playback & loop
 play
-[ "$player_function" = "download" ] && exit 0
+[ "$player_function" == "download" ] && exit 0
 
 while cmd=$(printf "next\nreplay\nprevious\nselect\nchange_quality\nskip\nquit" | nth "Playing $ep_title of $title... "); do
     case "$cmd" in
@@ -467,7 +466,7 @@ while cmd=$(printf "next\nreplay\nprevious\nselect\nchange_quality\nskip\nquit" 
         previous) ep_no=$(printf "%s" "$ep_list" | sed -n "/^${ep_no} /{g;1!p;};h" | cut -d ' ' -f1 | head -n1) 2>/dev/null && update_episode_title ;;
         select) ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1) && update_episode_title ;;
         change_quality)
-            episode=$(printf "%s" "$ql_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select quality: " | cut -f1) && verify_and_reroll_quality "$quality" ;;
+            episode=$(quality=$(printf "%s" "$ql_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select quality: " | cut -f1) && verify_and_reroll_quality "$quality") ;;
         skip)
             skip=$(printf "1	Yes\n0	No" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select skip: " | cut -f1) ;;
         *) exit 0 ;;
