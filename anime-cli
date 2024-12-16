@@ -438,7 +438,7 @@ case "$search" in
         fi
 
         query=$(printf "%s" "$query" | sed "s| |+|g")
-        anime_list=$(search_anime "$query")
+        anime_list=$(search_anime "$query" | sort -t '	' -k 2)
         [ -z "$anime_list" ] && die "No results found!"
         [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")
         [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
