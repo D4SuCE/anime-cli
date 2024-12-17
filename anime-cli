@@ -249,22 +249,25 @@ play_episode() {
     skip_flag="$(anime-skip -q "$id" -e "$ep_no")"
     [ "$skip" = 0 ] && skip_flag="$(printf "%s" "$skip_flag" | cut -d ' ' -f1)"
     [ -z "$episode" ] && get_episode_url
+
+    name="$(printf "${allanime_title}Episode ${ep_no} (${ep_title})" | sed "s/ (Episode [0-9]\+)//")"
+
     case "$player_function" in
         mpv*)
             if [ "$no_detach" = 0 ]; then
-                nohup "$player_function" $skip_flag --force-media-title="${allanime_title}${ep_title}" "$episode" >/dev/null 2>&1 &
+                nohup "$player_function" $skip_flag --force-media-title="$name" "$episode" >/dev/null 2>&1 &
             else
-                "$player_function" $skip_flag --force-media-title="${allanime_title}${ep_title}" "$episode"
+                "$player_function" $skip_flag --force-media-title="$name" "$episode"
                 mpv_exitcode=$?
                 [ "$exit_after_play" = 1 ] && exit "$mpv_exitcode"
             fi
             ;;
         android_mpv) nohup am start --user 0 -a android.intent.action.VIEW -d "$episode" -n is.xyz.mpv/.MPVActivity >/dev/null 2>&1 & ;;
-        android_vlc) nohup am start --user 0 -a android.intent.action.VIEW -d "$episode" -n org.videolan.vlc/org.videolan.vlc.gui.video.VideoPlayerActivity -e "title" "${allanime_title}Episode ${ep_no}" >/dev/null 2>&1 & ;;
-        *iina*) nohup "$player_function" --no-stdin --keep-running --mpv-force-media-title="${allanime_title}Episode ${ep_no}" "$episode" >/dev/null 2>&1 & ;;
-        flatpak_mpv) flatpak run io.mpv.Mpv --force-media-title="${allanime_title}Episode ${ep_no}" "$episode" >/dev/null 2>&1 & ;;
-        vlc*) nohup "$player_function" --play-and-exit --meta-title="${allanime_title}Episode ${ep_no}" "$episode" >/dev/null 2>&1 & ;;
-        *yncpla*) nohup "$player_function" "$episode" -- --force-media-title="${allanime_title}Episode ${ep_no}" >/dev/null 2>&1 & ;;
+        android_vlc) nohup am start --user 0 -a android.intent.action.VIEW -d "$episode" -n org.videolan.vlc/org.videolan.vlc.gui.video.VideoPlayerActivity -e "title" "$name" >/dev/null 2>&1 & ;;
+        *iina*) nohup "$player_function" --no-stdin --keep-running --mpv-force-media-title="$name" "$episode" >/dev/null 2>&1 & ;;
+        flatpak_mpv) flatpak run io.mpv.Mpv --force-media-title="$name" "$episode" >/dev/null 2>&1 & ;;
+        vlc*) nohup "$player_function" --play-and-exit --meta-title="$name" "$episode" >/dev/null 2>&1 & ;;
+        *yncpla*) nohup "$player_function" "$episode" -- --force-media-title="$name" >/dev/null 2>&1 & ;;
         download) "$player_function" "$episode" "${allanime_title}${ep_title}" ;;
         catt) nohup catt cast "$episode" >/dev/null 2>&1 & ;;
         iSH)
@@ -296,7 +299,7 @@ play() {
             ep_no=$i
             episodes_json=$(get_episodes_json)
             update_episode_title
-            printf "\33[2K\r\033[1;34mPlaying episode %s...\033[0m\n" "$ep_title"
+            printf "\33[2K\r\033[1;34mPlaying Episode %s (%s)...\033[0m\n" "$ep_no" "$ep_title" | sed "s/ (Episode [0-9]\+)//"
             play_episode
             wait
         done
@@ -463,7 +466,7 @@ tput sc
 play
 [ "$player_function" = "download" ] && exit 0
 
-while cmd=$(printf "next\nreplay\nprevious\nselect\nchange_quality\nskip\nquit" | nth "Playing $ep_title of $title... "); do
+while name="$(printf "Playing Episode $ep_no ($ep_title) of $title... " | sed "s/ (Episode [0-9]\+)//")" && cmd="$(printf "next\nreplay\nprevious\nselect\nchange_quality\nskip\nquit" | nth "$name")"; do
     case "$cmd" in
         next) ep_no=$(printf "%s" "$ep_list" | sed -n "/^${ep_no} /{n;p;}" |    cut -d ' ' -f1 | head -n1) 2>/dev/null && update_episode_title ;;
         replay) episode="$replay" ;;
