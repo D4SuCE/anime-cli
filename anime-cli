@@ -216,7 +216,7 @@ process_hist_entry() {
     ep_list=$(episodes_list)
     ep_no=$(printf "%s" "$ep_list" | sed -n "/^${ep_no} /{n;p;}" | cut -d ' ' -f1 | head -n1) 2>/dev/null
     update_episode_title
-    [ -n "$ep_no" ] && printf "%s\t%s - Episode %s ( %s )\n" "$id" "$title" "$ep_no" "$ep_title" | sed "s/ ( Episode [0-9]\+ )$//"
+    [ -n "$ep_no" ] && printf "%s\t%s - Episode %s ( %s )\n" "$id" "$title" "$ep_no" "$ep_title" | sed "s/ ( Episode [0-9]\+ )//"
 }
 
 update_history() {
