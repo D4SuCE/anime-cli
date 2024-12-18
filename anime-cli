@@ -171,7 +171,8 @@ episodes_list() {
 quality_list() {
     printf "%s" "$episodes_json" \
     | jq -r '.[] | select(.ordinal == '$ep_no') | "\(.hls_1080)	1080p\n\(.hls_720)	720p\n\(.hls_480)	480p"' \
-    | sed "/null/d"
+    | sed "/null/d" \
+    | sed -E "s/\?.*	/	/"
 }
 
 verify_and_reroll_quality() {
