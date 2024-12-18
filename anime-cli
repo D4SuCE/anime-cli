@@ -136,7 +136,7 @@ search_anime() {
         -H "accept: application/json" \
         | jq -r '.data[] | "\(.id) \(.name.main)"')
 
-    while read -r id name; do
+    printf "%s\n" "$ids_and_names" | while read -r id name; do
         request=$(curl -s -G "https://anilibria.top/api/v1/anime/releases/$id" \
             --data-urlencode "limit=40" \
             -H "accept: application/json")
@@ -153,8 +153,7 @@ search_anime() {
         else
             printf "%s	%s (%s episodes)\n" "$id" "$name" "$episodes_number"
         fi
-
-    done <<< "$ids_and_names"
+    done
 }
 
 get_episodes_json() {
