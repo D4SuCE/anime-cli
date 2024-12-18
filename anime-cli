@@ -245,6 +245,9 @@ download() {
 }
 
 play_episode() {
+    if ! printf "%s" "$ep_list" | grep -q "^$ep_no"; then
+        die "Episodes not selected!"
+    fi    
     [ "$log_episode" = 1 ] && [ "$player_function" != "download" ] && command -v logger >/dev/null && logger -t anime-cli "${allanime_title}${ep_no}"
     skip_flag="$(anime-skip -q "$id" -e "$ep_no")"
     [ "$skip" = 0 ] && skip_flag="$(printf "%s" "$skip_flag" | cut -d ' ' -f1)"
