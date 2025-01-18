@@ -21,9 +21,26 @@ help_info() {
         Show the version of the script
       -h, --help
         Show this help message and exit
+      -U, --update
+        Update the script
     Some example usages:
       %s -q 52299 -e 5 # Returns MPV skip flag
     \n" "${0##*/}" "${0##*/}" "${0##*/}" "${0##*/}" 
+    exit 0
+}
+
+update_script() {
+    update="$(curl -s "https://raw.githubusercontent.com/D4SuCE/anime-cli/main/anime-skip")" || die "Connection error"
+    update="$(printf '%s\n' "$update" | diff -u "$0" -)"
+    if [ -z "$update" ]; then
+        printf "Script is up to date :)\n"
+    else
+        if printf '%s\n' "$update" | patch "$0" -; then
+            printf "Script has been updated\n"
+        else
+            die "Can't update for some reason!"
+        fi
+    fi
     exit 0
 }
 
@@ -97,6 +114,7 @@ while [ $# -gt 0 ]; do
     case "$flag" in
         -V | --version) printf "%s\n" "$version_number" && exit 0 ;;
         -h | --help) help_info ;;
+        -U | --update) update_script ;;
         -q | --query)
             [ $# -lt 2 ] && die "missing anime ID!"
             case $2 in

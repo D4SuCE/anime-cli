@@ -26,10 +26,8 @@ nth() {
     if [ $# -ne 1 ]; then
         shift
         multi_flag="$1"
-        line=$(printf "%s" "$stdin" | cut -f1,3 | tr '\t' ' ' | launcher "$multi_flag" "$prompt")
-    else
-        line=$(printf "%s" "$stdin" | cut -f1,3 | tr '\t' ' ' | launcher "$multi_flag" "$prompt" | cut -d ' ' -f1)
     fi
+    line=$(printf "%s" "$stdin" | cut -f1,3 | tr '\t' ' ' | launcher "$multi_flag" "$prompt" | cut -d ' ' -f1)
     [ -n "$line" ] && result=$(printf "%s" "$stdin" | grep -E '^'"${line}"'($|[[:space:]])' | cut -f2,3)
     [ -n "$result" ] && printf "%s" "$result" && return
     [ -n "$line" ] && result=$(printf "%s" "$stdin" | grep -F -x "${line}" | cut -f2,3)
@@ -76,6 +74,10 @@ help_info() {
         Specify the number of episodes to watch
       -E, --export
         Export history to working directory
+      -R, --remove
+        Remove anime from history
+      -U, --update
+        Update the script
       --rofi
         Use rofi instead of fzf for the interactive menu
       --skip
@@ -97,6 +99,21 @@ help_info() {
 
 version_info() {
     printf "%s\n" "$version_number"
+    exit 0
+}
+
+update_script() {
+    update="$(curl -s "https://raw.githubusercontent.com/D4SuCE/anime-cli/main/anime-cli")" || die "Connection error"
+    update="$(printf '%s\n' "$update" | diff -u "$0" -)"
+    if [ -z "$update" ]; then
+        printf "Script is up to date :)\n"
+    else
+        if printf '%s\n' "$update" | patch "$0" -; then
+            printf "Script has been updated\n"
+        else
+            die "Can't update for some reason!"
+        fi
+    fi
     exit 0
 }
 
@@ -129,6 +146,27 @@ export_history() {
     printf "%s" "$anime_list" > "$(pwd)/history.txt"
     printf "\33[2K\r\033[1;34mSuccessful export of history to "$(pwd)/history.txt"\033[0m\n"
     exit 0
+}
+
+update_anime_title() {
+    pattern="episodes - Ongoing"
+    while read -r ep_no id title; do
+        if ! printf "%s" "$title" | grep -q "$pattern"; then
+            continue
+        fi
+        episodes_json=$(get_episodes_json "$id")
+        ep_list=$(episodes_list)
+        ep_count=$(printf "%s\n" "$ep_list" | wc -l)
+        ep_count_title=$(printf "%s" "$title" | cut -d '(' -f2 | cut -d '/' -f1)
+        ep_count_max=$(printf "%s" "$title" | cut -d '(' -f2 | cut -d '/' -f2 | cut -d ' ' -f1)
+        if [ "$ep_count" -gt "$ep_count_title" ]; then
+            title=$(printf "%s" "$title" | sed "s/ ([0-9]\+\// ($ep_count\//")
+        fi
+        if [ "$ep_count" -eq "$ep_count_max" ]; then
+            title=$(printf "%s" "$title" | sed "s/ ([0-9]\+\/[0-9]\+ $pattern)/ ($ep_count_max episodes)/")
+        fi
+        update_history
+    done < "$histfile"
 }
 
 update_episode_title() {
@@ -410,13 +448,15 @@ while [ $# -gt 0 ]; do
         -V | --version) version_info ;;
         -h | --help) help_info ;;
         -H | --history) search=history ;;
-        -E | --export) export_history ;;
         -e | --episode | -r | --range)
             [ $# -lt 2 ] && die "missing argument!"
             ep_no="$2"
             [ -n "$index" ] && ANI_CLI_NON_INTERACTIVE=1 #Checks for -S presence
             shift
             ;;
+        -E | --export) export_history ;;
+        -R | --remove) search=remove ;;
+        -U | --update) update_script ;;
         --no-detach) no_detach=1 ;;
         --exit-after-play) exit_after_play=1 ;;
         --rofi) use_external_menu=1 ;;
@@ -445,6 +485,7 @@ esac
 
 case "$search" in
     continue)
+        update_anime_title
         anime_list=$(while read -r ep_no id title; do process_hist_entry "$ep_no" "$id" "$title" & done < "$histfile")
         wait
         [ -z "$anime_list" ] && die "No unwatched series in history!"
@@ -460,15 +501,15 @@ case "$search" in
         update_episode_title
         ;;
     history)
+        update_anime_title
         while read -r ep_no id title; do
-            title="$(printf "%s" "$title" | sed "s/ ([0-9].*)//")"
             anime_list="$(printf "%s\n%s	%s\n" "$anime_list" "$id" "$title")"
         done < "$histfile"
         anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
         [ -z "$anime_list" ] && die "History is empty!"
         [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")
         [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
-        [ -z "$result" ] && exit 1        
+        [ -z "$result" ] && exit 1
         title=$(printf "%s" "$result" | cut -f2)
         allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
         id=$(printf "%s" "$result" | cut -f1)
@@ -477,6 +518,23 @@ case "$search" in
         [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
         [ -z "$ep_no" ] && exit 1
         update_episode_title
+        ;;
+    remove)
+        while read -r ep_no id title; do
+            title=$(printf "%s" "$title" | sed "s/ ([0-9].*)//")
+            anime_list="$(printf "%s\n%s	%s\n" "$anime_list" "$id" "$title")"
+        done < "$histfile"
+        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
+        [ -z "$anime_list" ] && die "History is empty!"
+        result=$(printf "%s" "$anime_list" | nl -w 2 | nth "Select anime: " "$multi_selection_flag")
+        [ -z "$result" ] && exit 1
+        ids=$(printf "%s" "$result" | cut -f1)
+        pattern=$(printf "%s" "$ids" | tr '\n' '|' | sed 's/|$//')
+        names=$(grep -E "$pattern" "$histfile" | cut -f3 | sed "s/ ([0-9].*)//")
+        grep -v -E "$pattern" "$histfile" > "${histfile}.new" && mv "${histfile}.new" "$histfile"
+        flag=$(grep -E "$pattern" "$histfile")
+        [ -z "$flag" ] && printf "\33[2K\r\033[1;34mSuccessful remove anime from history:\n%s\033[0m\n" "$names" && exit 0
+        [ -n "$flag" ] && die "Something went wrong!" && exit 1
         ;;
     *)
         if [ "$use_external_menu" = "0" ]; then
