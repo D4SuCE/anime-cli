@@ -56,6 +56,8 @@ help_info() {
         Delete history
       -l, --logview
         Show logs
+      -o, --ongoing
+        Show ongoing anime
       -s, --syncplay
         Use Syncplay to watch with friends
       -S, --select-nth
@@ -197,6 +199,32 @@ search_anime() {
     fi
 
     ids_and_names="$(printf "%s" "$request" | jq -r '.data[] | "\(.id) \(.name.main)"')"
+
+    printf "%s\n" "$ids_and_names" | while read -r id name; do
+        request=$(curl -s -G "${api_url}/anime/releases/$id" \
+            --data-urlencode "limit=40" \
+            -H "accept: application/json")
+            
+        episodes_number=$(printf "%s" "$request" | jq "[.episodes[] | select(.ordinal)] | length")
+        episodes_total=$(printf "%s" "$request" | jq -r ".episodes_total // \"0\"")
+
+        if [ "$episodes_number" = 0 ]; then
+            continue
+        fi
+        
+        if [ "$episodes_number" -lt "$episodes_total" ]; then
+            printf "%s	%s (%s/%s episodes - Ongoing)\n" "$id" "$name" "$episodes_number" "$episodes_total"
+        else
+            printf "%s	%s (%s episodes)\n" "$id" "$name" "$episodes_number"
+        fi
+    done
+}
+
+ongoing_anime() {
+    request=$(curl -s -G "${api_url}/anime/schedule/week" \
+        -H "accept: application/json")
+
+    ids_and_names="$(printf "%s" "$request" | jq -r '.[] | "\(.release.id) \(.release.name.main)"')"
 
     printf "%s\n" "$ids_and_names" | while read -r id name; do
         request=$(curl -s -G "${api_url}/anime/releases/$id" \
@@ -437,6 +465,7 @@ while [ $# -gt 0 ]; do
             : >"$histfile"
             exit 0
             ;;
+        -o | --ongoing) search=ongoing ;;
         -l | --logview)
             case "$(uname -s)" in
                 Darwin*) log show --predicate 'process == "logger"' ;;
@@ -498,6 +527,20 @@ case "$search" in
         ep_no=$(printf "%s" "$anime_list" | grep "$id" | cut -f2 | sed -nE 's/.*- Episode (.+)$/\1/p' | cut -d ' ' -f1)
         allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
         episodes_json=$(get_episodes_json "$id")
+        update_episode_title
+        ;;
+    ongoing)
+        anime_list=$(ongoing_anime | sort -t '	' -k 2)
+        [ -z "$anime_list" ] && die "No results found!"
+        [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
+        [ -z "$result" ] && exit 1        
+        title=$(printf "%s" "$result" | cut -f2)
+        allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
+        id=$(printf "%s" "$result" | cut -f1)
+        episodes_json=$(get_episodes_json "$id")
+        ep_list=$(episodes_list)
+        [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
+        [ -z "$ep_no" ] && exit 1
         update_episode_title
         ;;
     history)
