@@ -211,6 +211,10 @@ search_anime() {
             continue
         fi
         
+        if grep -q "$id" "$histfile"; then
+            name=$(printf "%s %s" "$watch_flag" "$name")
+        fi
+
         if [ "$episodes_number" -lt "$episodes_total" ]; then
             printf "%s	%s (%s/%s episodes - Ongoing)\n" "$id" "$name" "$episodes_number" "$episodes_total"
         else
@@ -235,6 +239,10 @@ ongoing_anime() {
 
         if [ "$episodes_number" = 0 ]; then
             continue
+        fi
+
+        if grep -q "$id" "$histfile"; then
+            name=$(printf "%s %s" "$watch_flag" "$name")
         fi
         
         if [ "$episodes_number" -lt "$episodes_total" ]; then
@@ -405,6 +413,7 @@ play() {
 
 # Setup
 
+watch_flag="✓"
 download_dir="${ANI_CLI_DOWNLOAD_DIR:-.}"
 log_episode="${ANI_CLI_LOG:-1}"
 quality="${ANI_CLI_QUALITY:-best}"
@@ -534,7 +543,7 @@ case "$search" in
         [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")        
         [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
         [ -z "$result" ] && exit 1        
-        title=$(printf "%s" "$result" | cut -f2)
+        title=$(printf "%s" "$result" | cut -f2 | sed "s/$watch_flag //")
         allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
         id=$(printf "%s" "$result" | cut -f1)
         episodes_json=$(get_episodes_json "$id")
@@ -595,7 +604,7 @@ case "$search" in
         [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")
         [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
         [ -z "$result" ] && exit 1        
-        title=$(printf "%s" "$result" | cut -f2)
+        title=$(printf "%s" "$result" | cut -f2 | sed "s/$watch_flag //")
         allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
         id=$(printf "%s" "$result" | cut -f1)
         episodes_json=$(get_episodes_json "$id")
