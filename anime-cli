@@ -20,7 +20,6 @@ nth() {
     stdin=$(cat -)
     [ -z "$stdin" ] && return 1
     line_count="$(printf "%s\n" "$stdin" | wc -l | tr -d "[:space:]")"
-    [ "$line_count" -eq 1 ] && printf "%s" "$stdin" | cut -f2,3 && return 0
     prompt="$1"
     multi_flag=""
     if [ $# -ne 1 ]; then
@@ -532,6 +531,7 @@ case "$search" in
     ongoing)
         anime_list=$(ongoing_anime | sort -t '	' -k 2)
         [ -z "$anime_list" ] && die "No results found!"
+        [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")        
         [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
         [ -z "$result" ] && exit 1        
         title=$(printf "%s" "$result" | cut -f2)
