@@ -224,7 +224,7 @@ search_anime() {
 }
 
 ongoing_anime() {
-    request=$(curl -s -G "${api_url}/anime/schedule/week" \
+    request=$(curl -s -G --compressed "${api_url}/anime/schedule/week" \
         -H "accept: application/json")
 
     ids_and_names="$(printf "%s" "$request" | jq -r '.[] | "\(.release.id) \(.release.name.main)"')"
