@@ -26,8 +26,8 @@ nth() {
         shift
         multi_flag="$1"
     fi
-    line=$(printf "%s" "$stdin" | cut -f1,3 | tr '\t' ' ' | launcher "$multi_flag" "$prompt" | cut -d ' ' -f1)
-    [ -n "$line" ] && result=$(printf "%s" "$stdin" | grep -E '^'"${line}"'($|[[:space:]])' | cut -f2,3)
+    line=$(printf "%s" "$stdin" | cut -f1,3 | tr '\t' ' ' | launcher "$multi_flag" "$prompt" | sed s/^[[:space:]]// | cut -d ' ' -f1 | tr '\n' '|' | sed 's/|$/\n/')
+    [ -n "$line" ] && result=$(printf "%s" "$stdin" | sed "s/^[[:space:]]//" | grep -E "^(${line})"'($|[[:space:]])' | cut -f2,3)
     [ -n "$result" ] && printf "%s" "$result" && return
     [ -n "$line" ] && result=$(printf "%s" "$stdin" | grep -F -x "${line}" | cut -f2,3)
     [ -n "$result" ] && printf "%s" "$result" && return
@@ -75,8 +75,14 @@ help_info() {
         Specify the number of episodes to watch
       -E, --export
         Export history to working directory
+      -f, --future
+        Show future list
+      -F, --add-future
+        Add anime to future list
       -R, --remove
         Remove anime from history
+      -RF, --remove-future
+        Remove anime from future list
       -U, --update
         Update the script
       --rofi
@@ -325,6 +331,16 @@ update_history() {
     mv "${histfile}.new" "$histfile"
 }
 
+update_future() {
+    if grep -q -- "$id" "$futfile"; then
+        printf "\33[2K\r\033[1;34mThis is anime already in your future list!\033[0m\n"
+    else
+        cp "$futfile" "${futfile}.new"
+        printf "%s\t%s\n" "$id" "$title" >>"${futfile}.new"
+    fi
+    mv "${futfile}.new" "$futfile"
+}
+
 download() {
     case $1 in
         *m3u8*)
@@ -430,11 +446,14 @@ no_detach="${ANI_CLI_NO_DETACH:-0}"
 exit_after_play="${ANI_CLI_EXIT_AFTER_PLAY:-0}"
 use_external_menu="${ANI_CLI_EXTERNAL_MENU:-0}"
 skip="${ANI_CLI_SKIP_INTRO:-0}"
+future="${ANI_CLI_ADD_FUTURE:-0}"
 [ -t 0 ] || use_external_menu=1
 hist_dir="${ANI_CLI_HIST_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/anime-cli}"
 [ ! -d "$hist_dir" ] && mkdir -p "$hist_dir"
 histfile="$hist_dir/anime-history"
+futfile="$hist_dir/anime-future"
 [ ! -f "$histfile" ] && : >"$histfile"
+[ ! -f "$futfile" ] && : >"$futfile"
 search="${ANI_CLI_DEFAULT_SOURCE:-scrape}"
 
 while [ $# -gt 0 ]; do
@@ -491,8 +510,11 @@ while [ $# -gt 0 ]; do
             [ -n "$index" ] && ANI_CLI_NON_INTERACTIVE=1 #Checks for -S presence
             shift
             ;;
+        -f | --future) search=future ;;
+        -F | --add-future) future=1 ;;
         -E | --export) export_history ;;
         -R | --remove) search=remove ;;
+        -RF | --remove-future) search=remove-future ;;
         -U | --update) update_script ;;
         --no-detach) no_detach=1 ;;
         --exit-after-play) exit_after_play=1 ;;
@@ -546,6 +568,7 @@ case "$search" in
         title=$(printf "%s" "$result" | cut -f2 | sed "s/$watch_flag //")
         allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
         id=$(printf "%s" "$result" | cut -f1)
+        [ "$future" = 1 ] && update_future "$id" "$title" && exit 0
         episodes_json=$(get_episodes_json "$id")
         ep_list=$(episodes_list)
         [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
@@ -559,6 +582,25 @@ case "$search" in
         done < "$histfile"
         anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
         [ -z "$anime_list" ] && die "History is empty!"
+        [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")
+        [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
+        [ -z "$result" ] && exit 1
+        title=$(printf "%s" "$result" | cut -f2)
+        allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
+        id=$(printf "%s" "$result" | cut -f1)
+        episodes_json=$(get_episodes_json "$id")
+        ep_list=$(episodes_list)
+        [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
+        [ -z "$ep_no" ] && exit 1
+        update_episode_title
+        ;;
+    future)
+        update_anime_title
+        while read -r id title; do
+            anime_list="$(printf "%s\n%s	%s\n" "$anime_list" "$id" "$title")"
+        done < "$futfile"
+        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
+        [ -z "$anime_list" ] && die "Future is empty!"
         [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")
         [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
         [ -z "$result" ] && exit 1
@@ -588,6 +630,24 @@ case "$search" in
         [ -z "$flag" ] && printf "\33[2K\r\033[1;34mSuccessful remove anime from history:\n%s\033[0m\n" "$names" && exit 0
         [ -n "$flag" ] && die "Something went wrong!" && exit 1
         ;;
+    remove-future)
+        while read -r id title; do
+            title=$(printf "%s" "$title" | sed "s/ ([0-9].*)//")
+            anime_list="$(printf "%s\n%s	%s\n" "$anime_list" "$id" "$title")"
+        done < "$futfile"
+        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
+        [ -z "$anime_list" ] && die "Future is empty!"
+        result=$(printf "%s" "$anime_list" | nl -w 2 | nth "Select anime: " "$multi_selection_flag")
+        [ -z "$result" ] && exit 1
+        printf "%s" "$result" > file.txt
+        ids=$(printf "%s" "$result" | cut -f1)
+        pattern=$(printf "%s" "$ids" | tr '\n' '|' | sed 's/|$//')
+        names=$(grep -E "$pattern" "$futfile" | cut -f2 | sed "s/ ([0-9].*)//")
+        grep -v -E "$pattern" "$futfile" > "${futfile}.new" && mv "${futfile}.new" "$futfile"
+        flag=$(grep -E "$pattern" "$futfile")
+        [ -z "$flag" ] && printf "\33[2K\r\033[1;34mSuccessful remove anime from future:\n%s\033[0m\n" "$names" && exit 0
+        [ -n "$flag" ] && die "Something went wrong!" && exit 1
+        ;;
     *)
         if [ "$use_external_menu" = "0" ]; then
             while [ -z "$query" ]; do
@@ -607,6 +667,7 @@ case "$search" in
         title=$(printf "%s" "$result" | cut -f2 | sed "s/$watch_flag //")
         allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
         id=$(printf "%s" "$result" | cut -f1)
+        [ "$future" = 1 ] && update_future "$id" "$title" && exit 0
         episodes_json=$(get_episodes_json "$id")
         ep_list=$(episodes_list)
         [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
