@@ -58,8 +58,17 @@ Specify the episode numbers to watch. If range is specified it should be quoted 
 \fB\-E | --export\fR
 Export history to working directory.
 .TP
+\fB\-f | --future\fR
+Show future list.
+.TP
+\fB\-F | --add-future\fR
+Add anime to future list.
+.TP
 \fB\-R | --remove\fR
 Remove anime from history.
+.TP
+\fB\-RF | --remove-future\fR
+Remove anime from future list.
 .TP
 \fB\-U | --update\fR
 Fetch update from github.
@@ -109,6 +118,9 @@ Controls the default source. Valid is history (equivalent to -c), everything els
 .TP
 \fBANI_CLI_SKIP_INTRO\fR
 Controls if ani-skip is used to skip intros (works with mpv only). Can be 0 (disabled) or 1 (enabled). Default is 0.
+.TP
+\fBANI_CLI_ADD_FUTURE\fR
+Controls of the future flag is used to add anime to the future list. Can be 0 (disabled) or 1 (enabled). Default is 0.
 .TP
 \fBANI_CLI_NO_DETACH\fR
 Controls if mpv is detached from the main process for playback, which can be useful for use with terminal renderers such as kitty. (works with mpv only). Can be 0 (disabled) or 1 (enabled). Default is 0.
