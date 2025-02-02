@@ -625,7 +625,8 @@ case "$search" in
         ids=$(printf "%s" "$result" | cut -f1)
         pattern=$(printf "%s" "$ids" | tr '\n' '|' | sed 's/|$//')
         names=$(grep -E "$pattern" "$histfile" | cut -f3 | sed "s/ ([0-9].*)//")
-        grep -v -E "$pattern" "$histfile" > "${histfile}.new" && mv "${histfile}.new" "$histfile"
+        grep -v -E "$pattern" "$histfile" > "${histfile}.new"
+        mv "${histfile}.new" "$histfile"
         flag=$(grep -E "$pattern" "$histfile")
         [ -z "$flag" ] && printf "\33[2K\r\033[1;34mSuccessful remove anime from history:\n%s\033[0m\n" "$names" && exit 0
         [ -n "$flag" ] && die "Something went wrong!" && exit 1
@@ -639,11 +640,11 @@ case "$search" in
         [ -z "$anime_list" ] && die "Future is empty!"
         result=$(printf "%s" "$anime_list" | nl -w 2 | nth "Select anime: " "$multi_selection_flag")
         [ -z "$result" ] && exit 1
-        printf "%s" "$result" > file.txt
         ids=$(printf "%s" "$result" | cut -f1)
         pattern=$(printf "%s" "$ids" | tr '\n' '|' | sed 's/|$//')
         names=$(grep -E "$pattern" "$futfile" | cut -f2 | sed "s/ ([0-9].*)//")
-        grep -v -E "$pattern" "$futfile" > "${futfile}.new" && mv "${futfile}.new" "$futfile"
+        grep -v -E "$pattern" "$futfile" > "${futfile}.new"
+        mv "${futfile}.new" "$futfile"
         flag=$(grep -E "$pattern" "$futfile")
         [ -z "$flag" ] && printf "\33[2K\r\033[1;34mSuccessful remove anime from future:\n%s\033[0m\n" "$names" && exit 0
         [ -n "$flag" ] && die "Something went wrong!" && exit 1
