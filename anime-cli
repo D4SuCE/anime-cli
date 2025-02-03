@@ -580,7 +580,7 @@ case "$search" in
         while read -r ep_no id title; do
             anime_list="$(printf "%s\n%s	%s\n" "$anime_list" "$id" "$title")"
         done < "$histfile"
-        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
+        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d' | sort -t '	' -k 2)"
         [ -z "$anime_list" ] && die "History is empty!"
         [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")
         [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
@@ -599,7 +599,7 @@ case "$search" in
         while read -r id title; do
             anime_list="$(printf "%s\n%s	%s\n" "$anime_list" "$id" "$title")"
         done < "$futfile"
-        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
+        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d' | sort -t '	' -k 2)"
         [ -z "$anime_list" ] && die "Future is empty!"
         [ "$index" -eq "$index" ] 2>/dev/null && result=$(printf "%s" "$anime_list" | sed -n "${index}p")
         [ -z "$index" ] && result=$(printf "%s" "$anime_list" | nl -w 2 | sed 's/^[[:space:]]//' | nth "Select anime: ")
@@ -618,7 +618,7 @@ case "$search" in
             title=$(printf "%s" "$title" | sed "s/ ([0-9].*)//")
             anime_list="$(printf "%s\n%s	%s\n" "$anime_list" "$id" "$title")"
         done < "$histfile"
-        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
+        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d' | sort -t '	' -k 2)"
         [ -z "$anime_list" ] && die "History is empty!"
         result=$(printf "%s" "$anime_list" | nl -w 2 | nth "Select anime: " "$multi_selection_flag")
         [ -z "$result" ] && exit 1
@@ -636,7 +636,7 @@ case "$search" in
             title=$(printf "%s" "$title" | sed "s/ ([0-9].*)//")
             anime_list="$(printf "%s\n%s	%s\n" "$anime_list" "$id" "$title")"
         done < "$futfile"
-        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d')"
+        anime_list="$(printf "%s" "$anime_list" | sed '/^$/d' | sort -t '	' -k 2)"
         [ -z "$anime_list" ] && die "Future is empty!"
         result=$(printf "%s" "$anime_list" | nl -w 2 | nth "Select anime: " "$multi_selection_flag")
         [ -z "$result" ] && exit 1
