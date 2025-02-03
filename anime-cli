@@ -611,6 +611,8 @@ case "$search" in
         ep_list=$(episodes_list)
         [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
         [ -z "$ep_no" ] && exit 1
+        grep -v -E "$id" "$futfile" > "${futfile}.new"
+        mv "${futfile}.new" "$futfile"
         update_episode_title
         ;;
     remove)
