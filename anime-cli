@@ -6,17 +6,20 @@ version_number="1.0"
 
 use_external_menu=0
 
-external_menu() {
+external_menu()
+{
     rofi "$1" -sort -dmenu -i -width 1500 -p "$2"
 }
 
-launcher() {
+launcher()
+{
     [ "$use_external_menu" = "0" ] && [ -z "$1" ] && set -- "+m" "$2"
     [ "$use_external_menu" = "0" ] && fzf "$1" --reverse --cycle --prompt "$2"
     [ "$use_external_menu" = "1" ] && external_menu "$1" "$2"
 }
 
-nth() {
+nth()
+{
     stdin=$(cat -)
     [ -z "$stdin" ] && return 1
     line_count="$(printf "%s\n" "$stdin" | wc -l | tr -d "[:space:]")"
@@ -34,12 +37,14 @@ nth() {
     exit 1
 }
 
-die() {
+die()
+{
     printf "\33[2K\r\033[1;31m%s\033[0m\n" "$*" >&2
     exit 1
 }
 
-help_info() {
+help_info()
+{
     printf "
     Usage:
     %s [options] [query]
@@ -104,12 +109,14 @@ help_info() {
     exit 0
 }
 
-version_info() {
+version_info()
+{
     printf "%s\n" "$version_number"
     exit 0
 }
 
-update_script() {
+update_script()
+{
     update="$(curl -s "https://raw.githubusercontent.com/D4SuCE/anime-cli/main/anime-cli")" || die "Connection error"
     update="$(printf '%s\n' "$update" | diff -u "$0" -)"
     if [ -z "$update" ]; then
@@ -125,25 +132,29 @@ update_script() {
 }
 
 # checks if dependencies are present
-dep_ch() {
+dep_ch()
+{
     for dep; do
         command -v "$dep" >/dev/null || die "Program \"$dep\" not found. Please install it."
     done
 }
 
-where_iina() {
+where_iina()
+{
     [ -e "/Applications/IINA.app/Contents/MacOS/iina-cli" ] && echo "/Applications/IINA.app/Contents/MacOS/iina-cli" && return 0
     printf "%s" "iina" && return 0
 }
 
-where_mpv() {
+where_mpv()
+{
     command -v "flatpak" >/dev/null && flatpak info io.mpv.Mpv >/dev/null 2>&1 && printf "%s" "flatpak_mpv" && return 0
     printf "%s" "mpv" && return 0
 }
 
 # Scraping
 
-export_history() {
+export_history()
+{
     while read -r ep_no id title; do
         title="$(printf "%s" "$title" | sed "s/ ([0-9].*)//")"
         anime_list="$(printf "%s\n%s\n" "$anime_list" "$title")"
@@ -155,7 +166,8 @@ export_history() {
     exit 0
 }
 
-update_anime_title() {
+update_anime_title()
+{
     pattern="episodes - Ongoing"
     while read -r ep_no id title; do
         if ! printf "%s" "$title" | grep -q "$pattern"; then
@@ -176,11 +188,13 @@ update_anime_title() {
     done < "$histfile"
 }
 
-update_episode_title() {
+update_episode_title()
+{
     ep_title=$(printf "%s" "$ep_list" | sed -n "/^$ep_no /p" | sed "s/^[0-9]\+ //g")
 }
 
-select_quality() {
+select_quality()
+{
     case "$1" in
         best) result=$(printf "%s" "$ql_list" | head -n1 | cut -f1) ;;
         worst) result=$(printf "%s" "$ql_list" | tail -n1 | cut -f1) ;;
@@ -190,7 +204,8 @@ select_quality() {
     printf "%s" "$result"
 }
 
-search_anime() {
+search_anime()
+{
     request=$(curl -s -G "${api_url}/anime/catalog/releases" \
         --data-urlencode "f[search]=$query" \
         --data-urlencode "limit=40" \
@@ -229,7 +244,8 @@ search_anime() {
     done
 }
 
-ongoing_anime() {
+ongoing_anime()
+{
     request=$(curl -s -G --compressed "${api_url}/anime/schedule/week" \
         -H "accept: application/json")
 
@@ -259,26 +275,30 @@ ongoing_anime() {
     done
 }
 
-get_episodes_json() {
+get_episodes_json()
+{
     curl -s -G "${api_url}/anime/releases/$id" \
         --data-urlencode "limit=40" \
         -H "accept: application/json" \
         | jq '.episodes'
 }
 
-episodes_list() {
+episodes_list()
+{
     printf "%s" "$episodes_json" \
     | jq -r '.[] | "\(.ordinal) \(.name // ("Episode " + (.ordinal | tostring)))"'
 }
 
-quality_list() {
+quality_list()
+{
     printf "%s" "$episodes_json" \
     | jq -r '.[] | select(.ordinal == '$ep_no') | "\(.hls_1080)	1080p\n\(.hls_720)	720p\n\(.hls_480)	480p"' \
     | sed "/null/d" \
     | sed -E "s/\?.*	/	/"
 }
 
-verify_and_reroll_quality() {
+verify_and_reroll_quality()
+{
     url=$(select_quality "$quality")
     http_status=$(curl -o /dev/null -w "%{http_code}" -s "$url")
     if [ "$http_status" = 200 ]; then
@@ -300,7 +320,8 @@ verify_and_reroll_quality() {
     done
 }
 
-get_episode_url() {
+get_episode_url()
+{
     ql_list=$(quality_list)
     episode=$(verify_and_reroll_quality "$quality")
     
@@ -313,7 +334,8 @@ get_episode_url() {
 
 # Playing
 
-process_hist_entry() {
+process_hist_entry()
+{
     episodes_json=$(get_episodes_json "$id")
     ep_list=$(episodes_list)
     ep_no=$(printf "%s" "$ep_list" | sed -n "/^${ep_no} /{n;p;}" | cut -d ' ' -f1 | head -n1) 2>/dev/null
@@ -321,7 +343,8 @@ process_hist_entry() {
     [ -n "$ep_no" ] && printf "%s\t%s - Episode %s ( %s )\n" "$id" "$title" "$ep_no" "$ep_title" | sed "s/ ( Episode [0-9]\+ )//"
 }
 
-update_history() {
+update_history()
+{
     if grep -q -- "$id" "$histfile"; then
         sed -E "s|^[^	]+	${id}	[^	]+$|${ep_no}	${id}	${title}|" "$histfile" >"${histfile}.new"
     else
@@ -331,7 +354,8 @@ update_history() {
     mv "${histfile}.new" "$histfile"
 }
 
-update_future() {
+update_future()
+{
     if grep -q -- "$id" "$futfile"; then
         printf "\33[2K\r\033[1;34mThis is anime already in your future list!\033[0m\n"
     else
@@ -341,7 +365,8 @@ update_future() {
     mv "${futfile}.new" "$futfile"
 }
 
-download() {
+download()
+{
     case $1 in
         *m3u8*)
             if command -v "yt-dlp" >/dev/null; then
@@ -356,7 +381,8 @@ download() {
     esac
 }
 
-play_episode() {
+play_episode()
+{
     if ! printf "%s" "$ep_list" | grep -q "^$ep_no"; then
         die "Episodes not selected!"
     fi    
@@ -397,7 +423,8 @@ play_episode() {
     [ "$use_external_menu" = "1" ] && wait
 }
 
-play() {
+play()
+{
     start=$(printf "%s" "$ep_no" | grep -Eo '^(-1|[0-9]+(\.[0-9]+)?)')
     end=$(printf "%s" "$ep_no" | grep -Eo '(-1|[0-9]+(\.[0-9]+)?)$')
     [ "$start" = "-1" ] && ep_no=$(printf "%s" "$ep_list" | tail -n1) && unset start
