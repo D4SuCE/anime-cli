@@ -358,6 +358,7 @@ update_future()
 {
     if grep -q -- "$id" "$futfile"; then
         printf "\33[2K\r\033[1;34mThis is anime already in your future list!\033[0m\n"
+        exit 0
     else
         cp "$futfile" "${futfile}.new"
         printf "%s\t%s\n" "$id" "$title" >>"${futfile}.new"
