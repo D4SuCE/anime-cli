@@ -480,8 +480,10 @@ hist_dir="${ANI_CLI_HIST_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/anime-cli}"
 [ ! -d "$hist_dir" ] && mkdir -p "$hist_dir"
 histfile="$hist_dir/anime-history"
 futfile="$hist_dir/anime-future"
+tgfile="$hist_dir/anime-telegram"
 [ ! -f "$histfile" ] && : >"$histfile"
 [ ! -f "$futfile" ] && : >"$futfile"
+[ ! -f "$tgfile" ] && : >"$tgfile"
 search="${ANI_CLI_DEFAULT_SOURCE:-scrape}"
 
 while [ $# -gt 0 ]; do
@@ -548,6 +550,7 @@ while [ $# -gt 0 ]; do
         --exit-after-play) exit_after_play=1 ;;
         --rofi) use_external_menu=1 ;;
         --skip) skip=1 ;;
+        --telegram) search=telegram ;;
         *) query="$(printf "%s" "$query $1" | sed "s|^ ||;s| |+|g")" ;;
     esac
     shift
@@ -642,6 +645,43 @@ case "$search" in
         grep -v -E "$id" "$futfile" > "${futfile}.new"
         mv "${futfile}.new" "$futfile"
         update_episode_title
+        ;;
+    telegram)
+        BOT_TOKEN="<SECRET>"
+        CHAT_ID="<SECRET>"
+        previous_list=$(cat "$tgfile")
+        while true; do
+            update_anime_title
+            anime_list=$(while read -r ep_no id title; do process_hist_entry "$ep_no" "$id" "$title" & done < "$histfile")
+            wait
+            if [ -z "$anime_list" ]; then
+                previous_list=""
+                printf "%s\n" "$previous_list" > "$tgfile"
+                sleep 3600
+                continue
+            fi
+            previous_list_ids=$(printf "%s" "$previous_list" | cut -f1)
+            if [ -z "$previous_list_ids" ]; then
+                new_episodes=$(printf "%s" "$anime_list")
+            else
+                new_episodes=$(printf "%s" "$anime_list" | grep -v "$previous_list_ids")
+            fi
+            previous_list="$anime_list"
+            printf "%s\n" "$previous_list" > "$tgfile"
+            if [ -z "$new_episodes" ]; then
+                sleep 3600
+                continue
+            fi
+            titles=$(printf "%s" "$new_episodes" | cut -f2 | nl -s ". ")
+            message="New Episodes:"
+            message=$(printf "%s\n%s" "$message" "$titles")
+            curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d "chat_id=$CHAT_ID" \
+            -d "text=$message"
+            command -v logger >/dev/null && logger -t anime-cli-telegram "$titles"
+            sleep 3600
+        done
+        exit 0
         ;;
     remove)
         while read -r ep_no id title; do
