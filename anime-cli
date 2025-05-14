@@ -186,6 +186,24 @@ update_anime_title()
         fi
         update_history
     done < "$histfile"
+	
+	while read -r id title; do
+        if ! printf "%s" "$title" | grep -q "$pattern"; then
+            continue
+        fi
+        episodes_json=$(get_episodes_json "$id")
+        ep_list=$(episodes_list)
+        ep_count=$(printf "%s\n" "$ep_list" | wc -l)
+        ep_count_title=$(printf "%s" "$title" | cut -d '(' -f2 | cut -d '/' -f1)
+        ep_count_max=$(printf "%s" "$title" | cut -d '(' -f2 | cut -d '/' -f2 | cut -d ' ' -f1)
+        if [ "$ep_count" -gt "$ep_count_title" ]; then
+            title=$(printf "%s" "$title" | sed "s/ ([0-9]\+\// ($ep_count\//")
+        fi
+        if [ "$ep_count" -eq "$ep_count_max" ]; then
+            title=$(printf "%s" "$title" | sed "s/ ([0-9]\+\/[0-9]\+ $pattern)/ ($ep_count_max episodes)/")
+        fi
+		update_future
+    done < "$futfile"
 }
 
 update_episode_title()
@@ -285,8 +303,10 @@ get_episodes_json()
 
 episodes_list()
 {
-    printf "%s" "$episodes_json" \
-    | jq -r '.[] | "\(.ordinal) \(.name // ("Episode " + (.ordinal | tostring)))"'
+	if [ "$episodes_json" != "null" ]; then
+		printf "%s" "$episodes_json" \
+		| jq -r '.[] | "\(.ordinal) \(.name // ("Episode " + (.ordinal | tostring)))"'
+	fi
 }
 
 quality_list()
@@ -354,9 +374,9 @@ update_history()
     mv "${histfile}.new" "$histfile"
 }
 
-update_future()
+add_to_future()
 {
-    if grep -q -- "$id" "$futfile"; then
+	if grep -q -- "$id" "$futfile"; then
         printf "\33[2K\r\033[1;34mThis is anime already in your future list!\033[0m\n"
         exit 0
     else
@@ -364,6 +384,14 @@ update_future()
         printf "%s\t%s\n" "$id" "$title" >>"${futfile}.new"
     fi
     mv "${futfile}.new" "$futfile"
+}
+
+update_future()
+{
+    if grep -q -- "$id" "$futfile"; then
+        sed -E "s|^${id}	[^	]+$|${id}	${title}|" "$futfile" >"${futfile}.new"
+		mv "${futfile}.new" "$futfile"
+	fi
 }
 
 download()
@@ -599,7 +627,7 @@ case "$search" in
         title=$(printf "%s" "$result" | cut -f2 | sed "s/$watch_flag //")
         allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
         id=$(printf "%s" "$result" | cut -f1)
-        [ "$future" = 1 ] && update_future "$id" "$title" && exit 0
+        [ "$future" = 1 ] && add_to_future "$id" "$title" && exit 0
         episodes_json=$(get_episodes_json "$id")
         ep_list=$(episodes_list)
         [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
@@ -738,7 +766,7 @@ case "$search" in
         title=$(printf "%s" "$result" | cut -f2 | sed "s/$watch_flag //")
         allanime_title="$(printf "%s" "$title" | cut -d'(' -f1 | tr -d '[:punct:]')"
         id=$(printf "%s" "$result" | cut -f1)
-        [ "$future" = 1 ] && update_future "$id" "$title" && exit 0
+        [ "$future" = 1 ] && add_to_future "$id" "$title" && exit 0
         episodes_json=$(get_episodes_json "$id")
         ep_list=$(episodes_list)
         [ -z "$ep_no" ] && ep_no=$(printf "%s" "$ep_list" | nth "Select episode of $title: " "$multi_selection_flag" | cut -d ' ' -f1)        
