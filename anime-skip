@@ -50,7 +50,7 @@ format_time() {
 }
 
 get_timecodes() {
-    response=$(curl -s -G "https://anilibria.wtf/api/v1/anime/releases/$id" \
+    response=$(curl -s -G "https://anilibria.top/api/v1/anime/releases/$id" \
         --data-urlencode "limit=40" \
         -H "accept: application/json" \
         | jq '.episodes')
